@@ -1,0 +1,61 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+.vite/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Runtime data
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage and reports
+coverage/
+.nyc_output/
+*.lcov
+
+# Environment files (keep sample files committed)
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Cache directories
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+
+# Package manager stores
+.npm/
+.pnpm-store/
+.yarn/
+
+# IDE/editor files
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.tmp
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
