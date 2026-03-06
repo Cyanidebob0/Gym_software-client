@@ -12,14 +12,23 @@ import OwnerLayout from '../components/layout/OwnerLayout';
 import MemberLayout from '../components/layout/MemberLayout';
 import PagePlaceholder from '../components/common/PagePlaceholder';
 
+import ScrollToTop from '../components/common/ScrollToTop';
 import LandingPage from '../pages/LandingPage';
+import ServicesPage from '../pages/ServicesPage';
+import AboutPage from '../pages/AboutPage';
+import ContactPage from '../pages/ContactPage';
 
 const AppRouter = () => {
     return (
+        <>
+        <ScrollToTop />
         <Routes>
             {/* Public Routes */}
             <Route element={<MainLayout />}>
                 <Route path="/" element={<LandingPage />} />
+                <Route path="/services" element={<ServicesPage />} />
+                <Route path="/about" element={<AboutPage />} />
+                <Route path="/contact" element={<ContactPage />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/unauthorized" element={<div>Unauthorized Access</div>} />
@@ -60,6 +69,7 @@ const AppRouter = () => {
             {/* Catch All */}
             <Route path="*" element={<NotFound />} />
         </Routes>
+        </>
     );
 };
 

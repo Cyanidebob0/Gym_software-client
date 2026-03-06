@@ -2,17 +2,18 @@ import { Link } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import LandingNav from '../components/layout/LandingNav';
+import LandingFooter from '../components/layout/LandingFooter';
 
 const LandingPage = () => {
     const heroRef = useRef(null);
     const sectionOneRef = useRef(null);
-    const menuRef = useRef(null);
     const videoSectionRef = useRef(null);
     const videoMediaRef = useRef(null);
     const sectionThreeRef = useRef(null);
     const marqueeRef = useRef(null);
+    const mobileScrollCleanup = useRef(null);
     const sectionThreeAccentText = 'BEST BENEFITS';
-    const [menuOpen, setMenuOpen] = useState(false);
     const [hoveredClass, setHoveredClass] = useState(null);
 
     const studioClasses = [
@@ -35,13 +36,6 @@ const LandingPage = () => {
             const textParallaxY = isMobile ? 14 : 50;
             const videoParallaxY = isMobile ? -10 : 22;
             const parallaxScrub = isMobile ? 1.35 : true;
-
-            gsap.from('.landing-nav', {
-                y: '-100%',
-                opacity: 0,
-                duration: 1,
-                ease: 'power3.out',
-            });
 
             gsap.set('.stagger-line', { y: '100%' });
             gsap.to('.stagger-line', {
@@ -107,186 +101,50 @@ const LandingPage = () => {
                 });
             }
 
+            if (isMobile) {
+                const items = gsap.utils.toArray('.studio-section__item');
+                const viewportMid = window.innerHeight / 2;
+
+                const updateActive = () => {
+                    let closest = null;
+                    let closestDist = Infinity;
+
+                    items.forEach((item) => {
+                        const rect = item.getBoundingClientRect();
+                        const itemMid = rect.top + rect.height / 2;
+                        const dist = Math.abs(itemMid - viewportMid);
+                        if (dist < closestDist) {
+                            closestDist = dist;
+                            closest = item;
+                        }
+                    });
+
+                    items.forEach((item) => {
+                        if (item === closest && closestDist < window.innerHeight * 0.3) {
+                            item.classList.add('studio-section__item--active');
+                        } else {
+                            item.classList.remove('studio-section__item--active');
+                        }
+                    });
+                };
+
+                window.addEventListener('scroll', updateActive, { passive: true });
+                updateActive();
+                mobileScrollCleanup.current = () => window.removeEventListener('scroll', updateActive);
+            }
+
             ScrollTrigger.refresh();
         }, heroRef);
 
-        return () => ctx.revert();
+        return () => {
+            ctx.revert();
+            if (mobileScrollCleanup.current) mobileScrollCleanup.current();
+        };
     }, []);
-
-    const openMenu = () => {
-        setMenuOpen(true);
-        if (!menuRef.current) return;
-        gsap.fromTo(
-            menuRef.current,
-            { y: '-100%' },
-            {
-                y: '0%',
-                duration: 0.9,
-                ease: 'power2.in',
-                overwrite: 'auto',
-            },
-        );
-        gsap.fromTo(
-            '.menu-item',
-            { y: -140, opacity: 0 },
-            {
-                y: 0,
-                opacity: 1,
-                duration: 0.72,
-                ease: 'power3.out',
-                stagger: 0.11,
-                delay: 0.4,
-                overwrite: 'auto',
-            },
-        );
-        gsap.fromTo(
-            '.skulpt-menu__divider',
-            { y: -140, opacity: 0 },
-            {
-                y: 0,
-                opacity: 1,
-                duration: 0.72,
-                ease: 'power3.out',
-                stagger: 0.11,
-                delay: 0.4,
-                overwrite: 'auto',
-            },
-        );
-        gsap.fromTo(
-            '.menu-contact',
-            { y: 30, opacity: 0 },
-            {
-                y: 0,
-                opacity: 1,
-                duration: 0.5,
-                ease: 'power2.out',
-                delay: 0.5,
-                overwrite: 'auto',
-            },
-        );
-    };
-
-    const closeMenu = () => {
-        if (!menuRef.current) return;
-        gsap.to(menuRef.current, {
-            y: '-100%',
-            duration: 0.6,
-            ease: 'power3.inOut',
-            onComplete: () => setMenuOpen(false),
-        });
-    };
 
     return (
         <div ref={heroRef} className="w-full bg-dark text-white">
-            {/* Navbar */}
-            <nav className="landing-nav fixed top-0 left-0 right-0 z-50 flex justify-between items-center px-4 sm:px-6 md:px-12 py-5 md:py-6">
-                <div className="landing-nav__brand text-lg sm:text-2xl font-black tracking-widest">SWEAT ZONE</div>
-                <div className="flex items-center gap-3 sm:gap-6">
-                    <Link
-                        to="/login"
-                        className="hidden sm:inline-flex bg-primary hover:bg-primary-dark text-white px-5 md:px-7 py-2.5 md:py-3 rounded-full font-bold text-xs md:text-sm tracking-wider uppercase transition-all duration-300 hover:scale-105"
-                    >
-                        Get Started
-                    </Link>
-                    <button
-                        onClick={openMenu}
-                        className="bg-transparent border-none text-white text-sm sm:text-base font-semibold tracking-wider cursor-pointer hover:text-primary transition-colors duration-300"
-                    >
-                        Menu
-                    </button>
-                </div>
-            </nav>
-
-            {/* Fullscreen Menu Overlay */}
-            <div
-                ref={menuRef}
-                className="skulpt-menu fixed inset-0 z-[100] text-dark"
-                style={{ transform: 'translateY(-100%)' }}
-
-            >
-                <div className="skulpt-menu__header">
-                    <div className="skulpt-menu__logo">SWEAT ZONE</div>
-                    <button
-                        onClick={closeMenu}
-                        className="skulpt-menu__close"
-                    >
-                        <span className="skulpt-menu__close-text">Close</span>
-                        <span className="skulpt-menu__close-icon" aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-
-                <div className="skulpt-menu__grid">
-                    <div className="menu-item skulpt-menu__col">
-                        <Link
-                            to="/"
-                            onClick={closeMenu}
-                            className="skulpt-menu__label"
-                            data-text="SERVICES"
-                        >
-                            <span>SERVICES</span>
-                        </Link>
-                    </div>
-
-                    <div className="menu-item skulpt-menu__col skulpt-menu__col--divider">
-                        <span className="skulpt-menu__divider" aria-hidden="true" />
-                        <Link
-                            to="/login"
-                            onClick={closeMenu}
-                            className="skulpt-menu__label"
-                            data-text="ABOUT US"
-                        >
-                            <span>ABOUT US</span>
-                        </Link>
-                    </div>
-
-                    <div className="menu-item skulpt-menu__col skulpt-menu__col--divider">
-                        <span className="skulpt-menu__divider" aria-hidden="true" />
-                        <Link
-                            to="/"
-                            onClick={closeMenu}
-                            className="skulpt-menu__label"
-                            data-text="CONTACT"
-                        >
-                            <span>CONTACT</span>
-                        </Link>
-                    </div>
-
-                    <div className="menu-contact skulpt-menu__contact skulpt-menu__col--divider">
-                        <span className="skulpt-menu__divider" aria-hidden="true" />
-                        <a href="mailto:hallo@skulptfitness.nl" className="skulpt-menu__link">hallo@skulptfitness.nl</a>
-                        <a href="tel:0566659199" className="skulpt-menu__link">0566 659 199</a>
-                        <a href="https://maps.google.com/?q=Oedsmawei+11,+9001+ZJ+Grou" target="_blank" rel="noreferrer" className="skulpt-menu__link">Oedsmawei 11</a>
-                        <a href="https://maps.google.com/?q=Oedsmawei+11,+9001+ZJ+Grou" target="_blank" rel="noreferrer" className="skulpt-menu__link">9001 ZJ Grou</a>
-
-                        <div className="skulpt-menu__hours">
-                            <h3>OPENING HOURS</h3>
-                            <p>Monday to Friday: 06:00 - 23:00</p>
-                            <p>Saturday & Sunday: 08:00 - 21:00</p>
-                        </div>
-
-                        <div className="skulpt-menu__hours">
-                            <h3>STAFFED HOURS</h3>
-                            <p>Monday to Friday: 08:00 - 22:00</p>
-                            <p>Saturday & Sunday: 09:00 - 13:00</p>
-                        </div>
-
-                        <div className="skulpt-menu__socials">
-                            <a href="/" aria-label="Facebook" className="skulpt-menu__social">
-                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="M13.9 8.4V6.8c0-.7.5-.8.8-.8h2V3h-2.8c-3.1 0-3.8 2.3-3.8 3.9v1.5H8v3h2.1V21h3.8v-9.6h2.6l.3-3h-2.9z" />
-                                </svg>
-                            </a>
-                            <a href="/" aria-label="Instagram" className="skulpt-menu__social">
-                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                    <rect x="4" y="4" width="16" height="16" rx="4" />
-                                    <circle cx="12" cy="12" r="3.4" />
-                                    <circle cx="17.3" cy="6.8" r="1.2" />
-                                </svg>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <LandingNav />
 
             {/* Hero Section - Full Viewport */}
             <section ref={sectionOneRef} className="landing-hero w-full h-screen md:min-h-screen flex flex-col justify-center px-4 sm:px-6 md:px-12 relative overflow-hidden pt-16 sm:pt-20">
@@ -515,6 +373,8 @@ const LandingPage = () => {
                     </div>
                 </div>
             </section>
+
+            <LandingFooter />
         </div>
     );
 };
