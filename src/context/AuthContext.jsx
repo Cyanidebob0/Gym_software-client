@@ -89,7 +89,11 @@ export const AuthProvider = ({ children }) => {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         const serverProfile = await syncAndLoadProfile(data.user);
-        return { user: data.user, profile: serverProfile };
+        return {
+            user: data.user,
+            profile: serverProfile,
+            profileLoaded: serverProfile !== null,
+        };
     };
 
     const register = async (email, password, name, phone) => {

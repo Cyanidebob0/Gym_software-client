@@ -47,7 +47,17 @@ const Register = () => {
             await register(form.email, form.password, form.name, form.phone);
 
             try {
-                const { profile } = await login(form.email, form.password);
+                const { profile, profileLoaded } = await login(form.email, form.password);
+                if (!profileLoaded) {
+                    navigate('/login', {
+                        replace: true,
+                        state: {
+                            passwordSetupError: 'Account created, but we could not verify your role yet. Please sign in again in a moment.',
+                        },
+                    });
+                    return;
+                }
+
                 const role = profile?.role ?? 'member';
 
                 if (role === 'super_admin') {
