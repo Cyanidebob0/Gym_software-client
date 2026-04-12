@@ -12,6 +12,10 @@ const ProtectedRoute = ({ allowedRoles }) => {
         return <Navigate to="/login" replace />;
     }
 
+    if (allowedRoles && role == null) {
+        return <div>Loading...</div>;
+    }
+
     if (allowedRoles && role !== 'super_admin' && !allowedRoles.includes(role)) {
         return <Navigate to="/unauthorized" replace />;
     }
