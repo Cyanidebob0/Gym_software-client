@@ -1,7 +1,7 @@
 // Toggle this when switching frontend targets locally.
-export const ENV = 'DEV';
+//export const ENV = 'DEV';
 
-// export const ENV = 'PROD';
+ export const ENV = 'PROD';
 
 const URLS = {
     DEV: {
