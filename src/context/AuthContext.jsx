@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 import supabase from '../services/supabase';
 import api from '../services/api';
 import { appConfig } from '../config';
@@ -11,52 +11,24 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
-    const profileRef = useRef(null);
-    const profileLoadRef = useRef(null);
-
-    useEffect(() => {
-        profileRef.current = profile;
-    }, [profile]);
 
     const syncAndLoadProfile = async (authUser) => {
         if (!authUser) {
-            profileLoadRef.current = null;
             setProfile(null);
             return null;
         }
 
-        if (profileRef.current?.id === authUser.id) {
-            return profileRef.current;
+        await api.post('/v1/auth/sync', { name: authUser.user_metadata?.name || '' }).catch(() => {});
+
+        try {
+            const response = await api.get('/v1/auth/me');
+            const serverProfile = response.data?.data ?? null;
+            setProfile(serverProfile);
+            return serverProfile;
+        } catch {
+            setProfile(null);
+            return null;
         }
-
-        if (profileLoadRef.current?.userId === authUser.id) {
-            return profileLoadRef.current.promise;
-        }
-
-        const promise = (async () => {
-            await api.post('/v1/auth/sync', { name: authUser.user_metadata?.name || '' }).catch(() => {});
-
-            try {
-                const response = await api.get('/v1/auth/me');
-                const serverProfile = response.data?.data ?? null;
-                setProfile(serverProfile);
-                return serverProfile;
-            } catch {
-                setProfile(null);
-                return null;
-            }
-        })();
-
-        profileLoadRef.current = {
-            userId: authUser.id,
-            promise,
-        };
-
-        return promise.finally(() => {
-            if (profileLoadRef.current?.userId === authUser.id) {
-                profileLoadRef.current = null;
-            }
-        });
     };
 
     useEffect(() => {
@@ -72,7 +44,6 @@ export const AuthProvider = ({ children }) => {
             setUser(authUser);
 
             if (!authUser) {
-                profileLoadRef.current = null;
                 setProfile(null);
                 setLoading(false);
                 return;
@@ -128,7 +99,6 @@ export const AuthProvider = ({ children }) => {
 
     const logout = async () => {
         await supabase.auth.signOut();
-        profileLoadRef.current = null;
         setUser(null);
         setProfile(null);
     };
