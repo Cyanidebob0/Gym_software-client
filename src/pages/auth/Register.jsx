@@ -47,8 +47,16 @@ const Register = () => {
             await register(form.email, form.password, form.name, form.phone);
 
             try {
-                await login(form.email, form.password);
-                navigate('/member');
+                const { profile } = await login(form.email, form.password);
+                const role = profile?.role ?? 'member';
+
+                if (role === 'super_admin') {
+                    navigate('/admin');
+                } else if (role === 'owner') {
+                    navigate('/owner');
+                } else {
+                    navigate('/member');
+                }
             } catch {
                 navigate('/login');
             }
