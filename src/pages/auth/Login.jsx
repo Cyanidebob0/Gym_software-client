@@ -82,12 +82,7 @@ const Login = () => {
         setLoading(true);
 
         try {
-            const { profile, profileLoaded } = await login(email, password);
-            if (!profileLoaded) {
-                setError('Signed in, but we could not verify your account yet. Please try again in a moment.');
-                return;
-            }
-
+            const { profile } = await login(email, password);
             const role = profile?.role ?? 'member';
 
             if (role === 'super_admin') {
@@ -104,12 +99,6 @@ const Login = () => {
                 setError('You are not authorised as a gym owner.');
             }
         } catch (err) {
-            if (err?.response?.status === 429) {
-                setError('Too many requests right now. Please wait a minute and try again.');
-                console.error(err);
-                return;
-            }
-
             try {
                 const eligible = await checkGooglePasswordSetupEligibility(email);
                 if (eligible) {
