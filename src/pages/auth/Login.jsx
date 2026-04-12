@@ -231,13 +231,6 @@ const Login = () => {
                         </p>
                     )}
 
-                    {mode === 'admin' && (
-                        <p className="login-register-link">
-                            No account?{' '}
-                            <Link to="/register" state={{ mode: 'admin' }} className="login-register-link__anchor">Register as admin</Link>
-                        </p>
-                    )}
-
                 </div>
             </div>
         </div>

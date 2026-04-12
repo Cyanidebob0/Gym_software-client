@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import supabase from '../services/supabase';
 import api from '../services/api';
 import { ADMIN_ALLOWED_EMAILS } from '../constants/adminEmails';
+import { OWNER_ALLOWED_EMAILS } from '../constants/ownerEmails';
 
 const AuthContext = createContext();
 
@@ -21,10 +22,15 @@ export const AuthProvider = ({ children }) => {
         // Listen for auth state changes (login, logout, OAuth callback)
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
             setUser(session?.user ?? null);
-            // Sync user to server DB on first sign-in or OAuth
+            // Sync user to server DB on first sign-in or OAuth. Pass along the
+            // role hint from signup metadata — the server validates it against
+            // its own whitelist and is authoritative.
             if (event === 'SIGNED_IN' && session?.user) {
                 const u = session.user;
-                api.post('/v1/auth/sync', { name: u.user_metadata?.name || '' }).catch(() => {});
+                api.post('/v1/auth/sync', {
+                    name: u.user_metadata?.name || '',
+                    role: u.user_metadata?.role,
+                }).catch(() => {});
             }
         });
 
@@ -76,10 +82,20 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
     };
 
+    // Derive effective role. Order of precedence:
+    //   1. super_admin whitelist (highest)
+    //   2. owner whitelist
+    //   3. role from Supabase metadata (set at signup)
+    //   4. 'member' default
+    // The server re-validates this against its own whitelist; these constants
+    // only drive client-side routing so the UI doesn't flicker through /member.
     const emailLower = user?.email?.toLowerCase() ?? '';
+    const metadataRole = user?.app_metadata?.role ?? user?.user_metadata?.role;
     const role = ADMIN_ALLOWED_EMAILS.includes(emailLower)
         ? 'super_admin'
-        : (user?.app_metadata?.role ?? user?.user_metadata?.role ?? 'member');
+        : OWNER_ALLOWED_EMAILS.includes(emailLower)
+            ? 'owner'
+            : (metadataRole ?? 'member');
 
     const value = {
         user,

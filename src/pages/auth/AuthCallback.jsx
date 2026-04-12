@@ -8,14 +8,15 @@ const AuthCallback = () => {
 
     useEffect(() => {
         if (loading) return;
-        const params = new URLSearchParams(window.location.search);
-        const mode = params.get('mode') ?? 'member';
 
         if (!user) {
             navigate('/login');
             return;
         }
-        if (mode === 'admin' && role === 'super_admin') navigate('/admin');
+        // Route by effective role from AuthContext (whitelist-aware).
+        // super_admin always lands on /admin; the `mode` query param is only
+        // a hint and shouldn't override authoritative role.
+        if (role === 'super_admin') navigate('/admin');
         else if (role === 'owner') navigate('/owner');
         else navigate('/member');
     }, [user, role, loading, navigate]);

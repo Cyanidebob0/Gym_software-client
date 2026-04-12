@@ -58,10 +58,23 @@ api.interceptors.response.use(
         }
         return response;
     },
-    (error) => {
-        if (error.response?.status === 401) {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
+    async (error) => {
+        const original = error.config;
+        // A single 401 is often transient: server-side Supabase verification
+        // can fail on a network blip, or the token rotated mid-flight. Try a
+        // refresh + one retry before tearing down the session — otherwise the
+        // owner gets booted to /login on every hiccup.
+        if (error.response?.status === 401 && original && !original._retried) {
+            original._retried = true;
+            try {
+                const { data, error: refreshErr } = await supabase.auth.refreshSession();
+                if (refreshErr || !data.session) throw refreshErr ?? new Error('no session');
+                cachedAccessToken = data.session.access_token;
+                original.headers = { ...original.headers, Authorization: `Bearer ${cachedAccessToken}` };
+                return api(original);
+            } catch {
+                supabase.auth.signOut().catch(() => {});
+            }
         }
         return Promise.reject(error);
     }

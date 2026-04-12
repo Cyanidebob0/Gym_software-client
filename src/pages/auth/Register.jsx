@@ -65,11 +65,7 @@ const Register = () => {
         } catch (err) {
             const msg = err.message ?? '';
             if (msg.toLowerCase().includes('already registered') || msg.toLowerCase().includes('user already exists')) {
-                setError(
-                    mode === 'admin'
-                        ? 'This email already has an account. Use "Continue with Google" on the admin login tab, or use Forgot Password to set a password.'
-                        : 'An account with this email already exists. Please sign in instead.'
-                );
+                setError('An account with this email already exists. Please sign in instead.');
             } else if (msg.toLowerCase().includes('password')) {
                 setError('Password must be at least 6 characters.');
             } else if (msg.toLowerCase().includes('invalid email')) {
