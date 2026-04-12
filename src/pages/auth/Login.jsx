@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import gsap from 'gsap';
-import { ADMIN_ALLOWED_EMAILS } from '../../constants/adminEmails';
-import { OWNER_ALLOWED_EMAILS } from '../../constants/ownerEmails';
+import Modal from '../../components/owner/Modal';
+import api from '../../services/api';
 
 const Login = () => {
     const [email, setEmail] = useState('');
@@ -11,7 +11,12 @@ const Login = () => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
-    const [mode, setMode] = useState('user'); // 'user' | 'owner'
+    const [ownerOauthModalOpen, setOwnerOauthModalOpen] = useState(false);
+    const [passwordSetupModalOpen, setPasswordSetupModalOpen] = useState(false);
+    const [passwordSetup, setPasswordSetup] = useState({ password: '', confirm: '' });
+    const [passwordSetupError, setPasswordSetupError] = useState('');
+    const location = useLocation();
+    const [mode, setMode] = useState(location.state?.mode === 'owner' ? 'owner' : 'user');
     const { login, loginWithGoogle } = useAuth();
     const navigate = useNavigate();
     const pageRef = useRef(null);
@@ -26,38 +31,85 @@ const Login = () => {
                 delay: 0.15,
             });
         }, pageRef);
+
         return () => ctx.revert();
     }, []);
+
+    useEffect(() => {
+        if (location.state?.mode === 'owner') {
+            setMode('owner');
+        }
+
+        if (location.state?.oauthOwnerNotice) {
+            setOwnerOauthModalOpen(true);
+        }
+
+        if (location.state?.passwordSetupError) {
+            setError(location.state.passwordSetupError);
+        }
+    }, [location.state]);
+
+    const checkGooglePasswordSetupEligibility = async (targetEmail) => {
+        const response = await api.post('/v1/auth/account-status', { email: targetEmail });
+        return response.data?.data?.canSetupPasswordViaGoogle === true;
+    };
+
+    const startPasswordSetupWithGoogle = async () => {
+        setPasswordSetupError('');
+
+        if (passwordSetup.password.length < 6) {
+            setPasswordSetupError('Password must be at least 6 characters.');
+            return;
+        }
+
+        if (passwordSetup.password !== passwordSetup.confirm) {
+            setPasswordSetupError('Passwords do not match.');
+            return;
+        }
+
+        sessionStorage.setItem('pendingPasswordSetup', JSON.stringify({
+            email: email.trim(),
+            password: passwordSetup.password,
+        }));
+
+        setLoading(true);
+        await loginWithGoogle();
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
         setLoading(true);
-        try {
-            const user = await login(email, password);
-            const emailLower = user?.email?.toLowerCase() ?? '';
-            const role = user?.app_metadata?.role
-                ?? user?.user_metadata?.role
-                ?? (ADMIN_ALLOWED_EMAILS.includes(emailLower) ? 'super_admin' : 'member');
 
-            // Super admin — always takes priority regardless of which tab
-            if (ADMIN_ALLOWED_EMAILS.includes(emailLower) || role === 'super_admin') {
+        try {
+            const { profile } = await login(email, password);
+            const role = profile?.role ?? 'member';
+
+            if (role === 'super_admin') {
                 navigate('/admin');
-            } else if (role === 'owner' || OWNER_ALLOWED_EMAILS.includes(emailLower)) {
+            } else if (role === 'owner') {
                 if (mode === 'owner') {
                     navigate('/owner');
                 } else {
                     setError('Please use the Owner tab to sign in.');
                 }
+            } else if (mode === 'user') {
+                navigate('/member');
             } else {
-                if (mode === 'user') {
-                    navigate('/member');
-                } else {
-                    setError('You are not authorised as a gym owner.');
-                }
+                setError('You are not authorised as a gym owner.');
             }
         } catch (err) {
-            setError('Invalid email or password. Please try again.');
+            try {
+                const eligible = await checkGooglePasswordSetupEligibility(email);
+                if (eligible) {
+                    setPasswordSetupModalOpen(true);
+                    setError('');
+                } else {
+                    setError('Invalid email or password. Please try again.');
+                }
+            } catch {
+                setError('Invalid email or password. Please try again.');
+            }
             console.error(err);
         } finally {
             setLoading(false);
@@ -67,7 +119,7 @@ const Login = () => {
     const handleGoogle = async () => {
         setLoading(true);
         try {
-            await loginWithGoogle(mode);
+            await loginWithGoogle();
         } catch (err) {
             setError('Google sign-in failed. Please try again.');
             console.error(err);
@@ -76,9 +128,8 @@ const Login = () => {
     };
 
     return (
+        <>
         <div ref={pageRef} className="login-page">
-
-            {/* Left — branding panel */}
             <div className="login-left">
                 <div className="login-left__bg" aria-hidden="true" />
                 <div className="login-left__overlay" aria-hidden="true" />
@@ -94,7 +145,6 @@ const Login = () => {
                 </div>
             </div>
 
-            {/* Right — form panel */}
             <div className="login-right">
                 <div className="login-form-wrap">
                     <Link to="/" className="login-back">
@@ -103,6 +153,7 @@ const Login = () => {
                         </svg>
                         Back
                     </Link>
+
                     <div className="login-tabs">
                         <button
                             type="button"
@@ -119,6 +170,7 @@ const Login = () => {
                             OWNER
                         </button>
                     </div>
+
                     <div className="login-form-wrap__header">
                         <span className="login-form-wrap__eyebrow">
                             {mode === 'owner' ? 'OWNER ACCESS' : 'MEMBER ACCESS'}
@@ -155,13 +207,13 @@ const Login = () => {
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required
-                                    placeholder="••••••••"
+                                    placeholder="........"
                                     className="login-field__input login-field__input--password"
                                 />
                                 <button
                                     type="button"
                                     className="login-field__eye"
-                                    onClick={() => setShowPassword(v => !v)}
+                                    onClick={() => setShowPassword((value) => !value)}
                                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                                 >
                                     {showPassword ? (
@@ -188,12 +240,13 @@ const Login = () => {
 
                         <button type="submit" className="login-submit" disabled={loading}>
                             {loading ? 'SIGNING IN' : 'SIGN IN'}
-                            {loading
-                                ? <span className="btn-spinner" />
-                                : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                            {loading ? (
+                                <span className="btn-spinner" />
+                            ) : (
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                                     <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
-                                  </svg>
-                            }
+                                </svg>
+                            )}
                         </button>
                     </form>
 
@@ -226,21 +279,85 @@ const Login = () => {
 
                     {mode === 'owner' && (
                         <p className="login-register-link">
-                            New owner?{' '}
-                            <Link to="/register" state={{ mode: 'owner' }} className="login-register-link__anchor">Register here</Link>
+                            Owner accounts are created by admin only.
                         </p>
                     )}
-
-                    {mode === 'admin' && (
-                        <p className="login-register-link">
-                            No account?{' '}
-                            <Link to="/register" state={{ mode: 'admin' }} className="login-register-link__anchor">Register as admin</Link>
-                        </p>
-                    )}
-
                 </div>
             </div>
         </div>
+        <Modal
+            isOpen={ownerOauthModalOpen}
+            onClose={() => setOwnerOauthModalOpen(false)}
+            title="Use Owner Sign-In"
+            size="sm"
+        >
+            <div className="space-y-4">
+                <p className="text-sm leading-6 text-gray-300">
+                    This account is registered as an owner. Please switch to the Owner tab and sign in using your email and password.
+                </p>
+                <div className="flex justify-end">
+                    <button
+                        type="button"
+                        onClick={() => setOwnerOauthModalOpen(false)}
+                        className="px-4 py-2 rounded-xl bg-[#e65100] text-white text-sm font-semibold hover:bg-[#f57c00] transition-colors"
+                    >
+                        OK
+                    </button>
+                </div>
+            </div>
+        </Modal>
+        <Modal
+            isOpen={passwordSetupModalOpen}
+            onClose={() => {
+                setPasswordSetupModalOpen(false);
+                setPasswordSetup({ password: '', confirm: '' });
+                setPasswordSetupError('');
+            }}
+            title="Google Account Found"
+            size="sm"
+        >
+            <div className="space-y-4">
+                <p className="text-sm leading-6 text-gray-300">
+                    This email is already linked to Google sign-in. If you want, you can set a password for the same account and then use either Google or email and password.
+                </p>
+                <div className="space-y-3">
+                    <input
+                        type="password"
+                        value={passwordSetup.password}
+                        onChange={(e) => setPasswordSetup((prev) => ({ ...prev, password: e.target.value }))}
+                        placeholder="New password"
+                        className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-[#e65100]/50"
+                    />
+                    <input
+                        type="password"
+                        value={passwordSetup.confirm}
+                        onChange={(e) => setPasswordSetup((prev) => ({ ...prev, confirm: e.target.value }))}
+                        placeholder="Retype password"
+                        className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-[#e65100]/50"
+                    />
+                </div>
+                {passwordSetupError && (
+                    <p className="text-sm text-red-400">{passwordSetupError}</p>
+                )}
+                <div className="flex justify-end gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setPasswordSetupModalOpen(false)}
+                        className="px-4 py-2 rounded-xl border border-white/10 text-gray-300 text-sm font-semibold hover:bg-white/5 transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={startPasswordSetupWithGoogle}
+                        className="px-4 py-2 rounded-xl bg-[#e65100] text-white text-sm font-semibold hover:bg-[#f57c00] transition-colors"
+                    >
+                        Save Password
+                    </button>
+                </div>
+            </div>
+        </Modal>
+        </>
     );
 };
 

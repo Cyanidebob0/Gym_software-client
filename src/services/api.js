@@ -1,5 +1,6 @@
 import axios from 'axios';
 import supabase from './supabase';
+import { appConfig } from '../config';
 
 // ── Key conversion utilities ──────────────────────────────────────────────────
 const snakeToCamel = (str) => str.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
@@ -30,7 +31,7 @@ supabase.auth.onAuthStateChange((_event, session) => {
 
 // ── Axios instance ────────────────────────────────────────────────────────────
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api',
+    baseURL: appConfig.apiBaseUrl,
     headers: { 'Content-Type': 'application/json' },
 });
 

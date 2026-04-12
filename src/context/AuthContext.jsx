@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import supabase from '../services/supabase';
 import api from '../services/api';
-import { ADMIN_ALLOWED_EMAILS } from '../constants/adminEmails';
+import { appConfig } from '../config';
 
 const AuthContext = createContext();
 
@@ -9,23 +9,48 @@ export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
+    const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
 
+    const syncAndLoadProfile = async (authUser) => {
+        if (!authUser) {
+            setProfile(null);
+            return null;
+        }
+
+        await api.post('/v1/auth/sync', { name: authUser.user_metadata?.name || '' }).catch(() => {});
+
+        try {
+            const response = await api.get('/v1/auth/me');
+            const serverProfile = response.data?.data ?? null;
+            setProfile(serverProfile);
+            return serverProfile;
+        } catch {
+            setProfile(null);
+            return null;
+        }
+    };
+
     useEffect(() => {
-        // Get initial session
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setUser(session?.user ?? null);
+        supabase.auth.getSession().then(async ({ data: { session } }) => {
+            const authUser = session?.user ?? null;
+            setUser(authUser);
+            await syncAndLoadProfile(authUser);
             setLoading(false);
         });
 
-        // Listen for auth state changes (login, logout, OAuth callback)
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-            setUser(session?.user ?? null);
-            // Sync user to server DB on first sign-in or OAuth
-            if (event === 'SIGNED_IN' && session?.user) {
-                const u = session.user;
-                api.post('/v1/auth/sync', { name: u.user_metadata?.name || '' }).catch(() => {});
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+            const authUser = session?.user ?? null;
+            setUser(authUser);
+
+            if (!authUser) {
+                setProfile(null);
+                setLoading(false);
+                return;
             }
+
+            await syncAndLoadProfile(authUser);
+            setLoading(false);
         });
 
         return () => subscription.unsubscribe();
@@ -34,26 +59,27 @@ export const AuthProvider = ({ children }) => {
     const login = async (email, password) => {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        return data.user;
+        const serverProfile = await syncAndLoadProfile(data.user);
+        return { user: data.user, profile: serverProfile };
     };
 
-    const register = async (email, password, name, phone, role = 'member') => {
+    const register = async (email, password, name, phone) => {
         const { data, error } = await supabase.auth.signUp({
             email,
             password,
             options: {
-                data: { name, phone, role },
+                data: { name, phone },
             },
         });
         if (error) throw error;
         return data.user;
     };
 
-    const loginWithGoogle = async (mode = 'member') => {
+    const loginWithGoogle = async () => {
         const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: `${window.location.origin}/auth/callback?mode=${mode}`,
+                redirectTo: `${appConfig.appUrl}/auth/callback?mode=user`,
             },
         });
         if (error) throw error;
@@ -61,7 +87,7 @@ export const AuthProvider = ({ children }) => {
 
     const forgotPassword = async (email) => {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: `${window.location.origin}/reset-password`,
+            redirectTo: `${appConfig.appUrl}/reset-password`,
         });
         if (error) throw error;
     };
@@ -74,15 +100,14 @@ export const AuthProvider = ({ children }) => {
     const logout = async () => {
         await supabase.auth.signOut();
         setUser(null);
+        setProfile(null);
     };
 
-    const emailLower = user?.email?.toLowerCase() ?? '';
-    const role = ADMIN_ALLOWED_EMAILS.includes(emailLower)
-        ? 'super_admin'
-        : (user?.app_metadata?.role ?? user?.user_metadata?.role ?? 'member');
+    const role = profile?.role ?? null;
 
     const value = {
         user,
+        profile,
         loading,
         login,
         register,

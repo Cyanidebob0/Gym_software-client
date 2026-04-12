@@ -1,12 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
+import { appConfig } from '../config';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Missing Supabase environment variables');
-}
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabase = createClient(appConfig.supabaseUrl, appConfig.supabaseAnonKey);
 
 export default supabase;
